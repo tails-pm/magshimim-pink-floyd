@@ -16,19 +16,19 @@ def main():
             client_sock, client_addr = listening_sock.accept()
             with client_sock:
                 # TODO: continue where i left off with the skeleton
-                client_sock.sendall('Welcome to PinkFloyd Debug Server!'.encode())
+                client_sock.sendall('Welcome to PinkFloyd Debug Server!\n'.encode())
                 while True:
                     req = client_sock.recv(1024).decode()
                     re_req = REQ_PTRN.search(req)
                     if re_req is None:
-                        client_sock.sendall('707:ERROR:UNKNOWN:INVALID COMMAND WAS RECIVED.'.encode())
+                        client_sock.sendall('707:ERROR:UNKNOWN:INVALID COMMAND WAS RECIVED.\n'.encode())
                     if int(re_req.group(1)) is EXIT_CODE:
-                        client_sock.sendall('Thank you for your time!'.encode())
+                        client_sock.sendall('Thank you for your time!\n'.encode())
                         break
 
-                    client_sock.sendall(RECEIVE_CHECK % (re_req.group(2), re_req.group(1)))
-        except Exception as e:
-            pass
+                    client_sock.sendall(RECEIVE_CHECK % (re_req.group(2), int(re_req.group(1))))
+        except Exception as err:
+            print(err)
 
 
 
