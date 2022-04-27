@@ -2,7 +2,7 @@
 
 <img src="https://i1.sndcdn.com/artworks-000374202633-pqm4gy-t500x500.jpg" alt="The Dark Side Of The Moon" width="200"/>
 
-![](https://img.shields.io/github/stars/pandao/editor.md.svg) ![](https://img.shields.io/github/forks/pandao/editor.md.svg) ![](https://img.shields.io/github/tag/pandao/editor.md.svg) ![](https://img.shields.io/github/release/pandao/editor.md.svg) ![](https://img.shields.io/github/issues/tails-pm/magshimim-pink-floyd) ![](https://img.shields.io/bower/v/editor.md.svg)
+![](https://img.shields.io/github/stars/tails-pm/magshimim-pink-floyd) ![](https://img.shields.io/github/forks/tails-pm/magshimim-pink-floyd) ![](https://img.shields.io/github/v/tag/tails-pm/magshimim-pink-floyd) ![](https://img.shields.io/github/v/release/tails-pm/magshimim-pink-floyd) ![](https://img.shields.io/github/issues/tails-pm/magshimim-pink-floyd) 
 
 **Table of Contents**
 
