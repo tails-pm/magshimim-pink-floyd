@@ -1,6 +1,8 @@
 import socket as sock
+import re
 
 LISTEN_PORT = 7160
+REQ_PTRN = re.compile(r'(\d{3}):([A-Z]+)(?:&(\w+(?: \w+)*))?')
 RECEIVE_CHECK = 'Request type: %s received!\nRequest code: %3d'
 EXIT_CODE = 249
 
@@ -12,12 +14,19 @@ def main():
 
         try:
             client_sock, client_addr = listening_sock.accept()
-            msg_code = 0
             with client_sock:
-                pass
                 # TODO: continue where i left off with the skeleton
-                # while msg_code is not EXIT_CODE:
-                #     client_sock.sendall('Welcome to PinkFloyd Debug Server!'.encode())
+                client_sock.sendall('Welcome to PinkFloyd Debug Server!'.encode())
+                while True:
+                    req = client_sock.recv(1024).decode()
+                    re_req = REQ_PTRN.search(req)
+                    if re_req is None:
+                        client_sock.sendall('707:ERROR:UNKNOWN:INVALID COMMAND WAS RECIVED.'.encode())
+                    if int(re_req.group(1)) is EXIT_CODE:
+                        client_sock.sendall('Thank you for your time!'.encode())
+                        break
+
+                    client_sock.sendall(RECEIVE_CHECK % (re_req.group(2), re_req.group(1)))
         except Exception as e:
             pass
 
