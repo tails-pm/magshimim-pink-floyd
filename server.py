@@ -1,5 +1,6 @@
 import socket as sock
 import re
+import data
 
 LISTEN_PORT = 7160
 REQ_PTRN = re.compile(r'(\d{3}):([A-Z]+)(?:&(\w+(?: \w+)*))?')
