@@ -1,24 +1,35 @@
 import json
 import os
 
-def create_json(filepath = './Pink_Floyd_DB.txt'):
-    DB = {}
+def create_json(filepath : str = './Pink_Floyd_DB.txt') -> None:
+    """create_json creates a JSON file from the Pink_Floyd_DB.txt.
+    
+    Args:
+        filepath (str, optional): filepath to the Pink_Floyd_DB.txt. Defaults to './Pink_Floyd_DB.txt'.
+    """    
+    formatted_db = {}
     with open(filepath, 'r') as file:
-        albm_test = file.read().split('#')[1]
-        albm_test = albm_test.split('*')
-        albm_test = [albm.split('::') for albm in albm_test]
+        album_list = file.read().split('#')
 
-        Songs = {song[0]: {'Writers': song[1], 'Duration': song[2], 'Lyrics': song[3].replace('. ', '.').split('\n')[:-1]} for song in albm_test[1:]}
+    del album_list[0] # delete the first index as its empty due to the file starting with '#'
+    # Split each album into its songs.
+    album_list = [album.split('*') for album in album_list]
+    # Split each song into its data.
+    album_list = [[song.split('::') for song in album] for album in album_list]
 
-        formatted_db = {albm_test[0][0]: {'Year': int(albm_test[0][1]), 'Songs': Songs}}
+    for album in album_list:
+        """We create a dict of all the songs in a given album.
+        song[0] is the name of the song, song[1] is a list of the writers of the song, song[2] is the duration of the song, song[3] are the lyrics of the song.
+        `song[3].split('\n')` - We take the lyrics of each song and split them at the newline.
+        `album[1:]` - We start from the second index because the first index contains the albums information."""
+        Songs = {song[0]: {'Writers': song[1], 'Duration': song[2], 'Lyrics': song[3].split('\n')} for song in album[1:]}
+        
+        # We add a new key album[0][0] aka album name, and add into it a dict with its year of release `int(album[0][1])` and its songs.
+        formatted_db[album[0][0]] = {'Year': int(album[0][1]), 'Songs': Songs}
 
-        # print(formatted_db)
-        print(json.dumps(formatted_db, indent=5))
-        with open('pink_db.json', 'w') as outfile:
-            outfile.write(json.dumps(formatted_db, indent=5))
-
-
-
+    with open('pink_db.json', 'w') as outfile:
+        # Convert the dict into json format and save into a file.
+        outfile.write(json.dumps(formatted_db, indent=5))
 
 
 def main():
