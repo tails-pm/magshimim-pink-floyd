@@ -36,7 +36,7 @@ def main():
     if not os.path.exists('pink_db.json'):
         create_json()
     else:
-        print('file exists!')
+        pass
 
 
 
