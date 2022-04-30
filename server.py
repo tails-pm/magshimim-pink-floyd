@@ -23,11 +23,12 @@ def main():
                     re_req = REQ_PTRN.search(req)
                     if re_req is None:
                         client_sock.sendall('707:ERROR:UNKNOWN:INVALID COMMAND WAS RECIVED.\n'.encode())
+                        continue
                     if int(re_req.group(1)) is EXIT_CODE:
                         client_sock.sendall('Thank you for your time!\n'.encode())
                         break
 
-                    client_sock.sendall(RECEIVE_CHECK % (re_req.group(2), int(re_req.group(1))))
+                    client_sock.sendall((RECEIVE_CHECK % (re_req.group(2), int(re_req.group(1)))).encode())
         except Exception as err:
             print(err)
 
