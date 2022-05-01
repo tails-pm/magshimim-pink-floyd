@@ -72,7 +72,7 @@ def main():
                 reply = server_sock.recv(1024).decode()
 
                 re_reply = ERROR_PTRN.search(reply) # Check if the servers reply is an error.
-                if re_reply is not None: # If the servers reply does not match an error command print normally.
+                if re_reply is None: # If the servers reply does not match an error command print normally.
                     print(f'{console_colors.GREEN}[SERVER]: {console_colors.WHITE}{reply}\n')
                 else:
                     print(f'{console_colors.RED}[ERROR {re_reply.group(1)}]: {console_colors.YELLOW}{re_reply.group(2)}, {console_colors.WHITE}{re_reply.group(3)}')
