@@ -2,6 +2,9 @@ import json
 import os
 from typing import Union # This module is used only for type hinting and no other purpose.
 
+ALBUM_PREFIX = '#'
+SONG_PREFIX = '*'
+SONG_DATA_SEPARATOR = '::'
 class data(): # Approval from elinor.
     """data class manages a db of pink_floyd with data from Pink_Floyd_DB.txt"""    
     def __init__(self):
@@ -26,13 +29,15 @@ class data(): # Approval from elinor.
 
         formatted_db = {}
         with open(filepath, 'r') as file:
-            album_list = sorted(file.read().split('#'))
+            # Split the files data based on '#' that is the prefix of each album.
+            album_list = sorted(file.read().split(ALBUM_PREFIX))
 
         del album_list[0] # delete the first index as its empty due to the file starting with '#'
-        # Split each album into its songs.
-        album_list = [album.split('*') for album in album_list]
-        # Split each song into its data.
-        album_list = [[song.split('::') for song in album] for album in album_list]
+
+        # Split each album into its songs based on '*' that is the prefix of each songs.
+        album_list = [album.split(SONG_PREFIX) for album in album_list]
+        # Split each song into its data based on '::' that seperates each data from one another.
+        album_list = [[song.split(SONG_DATA_SEPARATOR) for song in album] for album in album_list]
 
         for album in album_list:
             """We create a dict of all the songs in a given album.

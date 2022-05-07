@@ -83,6 +83,8 @@ RES_PTRN = re.compile(r'OK:([A-Z]+)(?:&(.+))?')
 """
 FORTH_COMMA_PTRN = re.compile(r'(?:[^,]*(?:, )?){4}')
 
+MAX_PASS_ATTEMPTS = 3
+
 # These constants are only used for aestetic reasons, and has no effect in the codes structure.
 RED = '\033[91m'
 YELLOW = '\033[93m'
@@ -159,6 +161,35 @@ def print_response(requested_data: str, res: str) -> None:
         print(f'{GREEN}[SERVER]: {WHITE}{res}')
 
 
+def login_to_server(server_sock: sock.socket) -> bool:
+    """login_to_server requests user 3 times for a password and checks if the server returns a valid response.
+    
+    Args:
+        server_sock (sock.socket): the socket with the server.
+    
+    Returns:
+        bool: True if the client has guessed the correct password in three attempts. Otherwise False.
+    """    
+    for i in range(MAX_PASS_ATTEMPTS):
+        try:
+            try:
+                password = input('Please enter the password: ')
+                server_sock.sendall(password.encode())
+                response = server_sock.recv(RECV_LARGE).decode()
+
+                if ERROR_PTRN.search(response) is None: # If the response is not an error, return True.
+                    return True
+                else:
+                    print_response(None, response)
+            except ValueError or TypeError:
+                print(f'{YELLOW}[WARNING]: {WHITE}Invalid Input, please try again.')
+                # As an invalid input was catched try getting the input again.
+                continue
+        except KeyboardInterrupt:
+            print(f'{YELLOW}[WARNING]: {WHITE}Keyboard interrupted, please try again.')
+    return False # If the loop has ended it means that the client unsuccesfully guessed the password.
+
+
 def main():
     with sock.socket(sock.AF_INET, sock.SOCK_STREAM) as server_sock:
         try:
@@ -168,6 +199,8 @@ def main():
             # Print Welcome Message.
             print(f'{GREEN}[SERVER]: {WHITE}{welcome}')
 
+            if not login_to_server(server_sock):
+                raise Exception('Too many attempts, please try again later.')
             while True:
                 print(CHOICE_MENU)
                 try:

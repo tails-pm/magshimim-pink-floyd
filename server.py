@@ -1,8 +1,11 @@
 import socket as sock
+import select
 import re
+import hashlib
 from data import data
 
 LISTEN_PORT = 7160
+MAX_CLIENTS = 5
 
 DB = data() # Create the db object so we can create the list of commands.
 REQ_COMMANDS = {
@@ -17,10 +20,11 @@ REQ_COMMANDS = {
 
 WELCOME_MSG = 'Welcome to PinkFloyd Archive Server!\n'
 GOODBYE_MSG = 'Thank you for your time!\n'
-RES_FORMAT = 'OK:{0}&{1}\n'
+RES_FORMAT = 'OK:{0}&{1}'
 
-ERR_DB_FORMAT = "707:ERROR:UNKNOWN:\"{0}\" wasn't found.\n"
-ERR_SYNTAX = '700:ERROR:BADREQ:Invalid command was received.\n'
+ERR_SYNTAX = '700:ERROR:BADREQ:Invalid command was received.'
+ERR_DB_FORMAT = "707:ERROR:UNKNOWN:\"{0}\" wasn't found."
+ERR_PASS = "714:ERROR:INVALIDPASS:Password is invalid."
 
 EXIT_CODE = 249
 
@@ -44,12 +48,31 @@ EXIT_CODE = 249
 """
 REQ_PTRN = re.compile(r'(\d{3}):([A-Z]+)(?:&(\w+(?: \w+)*))?')
 
+HASH_PASSWORD = '7514b4069f27f8ca9080ec4ab6daedd0' # The password is ItayComeHome.
+unapproved_list = [] # Global list of sockets that are not yet allowed to log on to the server.
+
 # These constants are only used for aestetic reasons, and has no effect in the codes structure.
 RED = '\033[91m'
 YELLOW = '\033[93m'
 WHITE = '\033[0m'
 GREEN = '\033[92m'
 
+
+def login(sock: sock.socket, client_pass: bytes) -> None:
+    """login verifies if the clients pass is valid.
+    
+    If password found valid, then the client is removed from the unapproved_list.
+    Otherwise we continue as is.
+
+    Args:
+        sock (sock.socket): clients socket.
+        client_pass (bytes): the clients password sent.
+    """
+    if hashlib.md5(client_pass).hexdigest() == HASH_PASSWORD:  
+        unapproved_list.remove(sock)
+        sock.sendall("OK".encode())  
+    else:
+        sock.sendall(ERR_PASS.encode())
 
 def create_response(re_req : re.Pattern[str]) -> bytes:
     """create_response creates the ASIB response for the client.
@@ -72,35 +95,50 @@ def create_response(re_req : re.Pattern[str]) -> bytes:
 
 
 def main():
-    while True:
-        with sock.socket(sock.AF_INET, sock.SOCK_STREAM) as listening_sock:
-            listening_sock.bind(('', LISTEN_PORT))
-            listening_sock.listen(1)
-            try:
-                client_sock, client_addr = listening_sock.accept()
-                print(f'{GREEN}[NOTICE]: {WHITE}User has connected to the server.')
+    with sock.socket(sock.AF_INET, sock.SOCK_STREAM) as listening_sock:
+        listening_sock.setblocking(0)
+        listening_sock.bind(('', LISTEN_PORT))
+        listening_sock.listen(MAX_CLIENTS)
+        connections_list = [listening_sock]
+        try:
+            while True:
+                try:
+                    read_sockets, write_sockets, error_sockets = select.select(connections_list, [], [])
+                    for read_sock in read_sockets: # Move over each socket.
+                        if read_sock == listening_sock:
+                            client_sock, client_addr = listening_sock.accept()
+                            print(f'{GREEN}[NOTICE]: {WHITE}User has connected to the server.')
+                            client_sock.sendall(WELCOME_MSG.encode()) # Send Welcome message.
+                            connections_list.append(client_sock)
+                            unapproved_list.append(client_sock)
+                        else:
+                            try:
+                                req = read_sock.recv(1024)
+                                
+                                if read_sock in unapproved_list:
+                                    login(read_sock, req)
+                                    continue
+                                
+                                re_req = REQ_PTRN.search(req.decode()) # Check if the message received fits the requests of ASIB protocol.
+                            
+                                if re_req is None: # If the message received does not match.
+                                    read_sock.sendall(ERR_SYNTAX.encode())
+                                    continue # As an invalid message was received continue to the next iteration.
+                                
+                                if int(re_req.group(1)) is EXIT_CODE:
+                                    read_sock.sendall(GOODBYE_MSG.encode())
+                                    continue
+                                
+                                read_sock.sendall(create_response(re_req)) # If all is well, send the client its requested data.
+                            except sock.error:
+                                print(f'{YELLOW}[NOTICE]: {WHITE}User has disconnected from the server.')
+                                read_sock.close() # End the socket as the user had disconnected.
+                                connections_list.remove(read_sock)
 
-                with client_sock:
-                    client_sock.sendall(WELCOME_MSG.encode()) # Send Welcome message.
-                    
-                    while True:
-                        req = client_sock.recv(1024).decode()
-                        
-                        re_req = REQ_PTRN.search(req) # Check if the message received fits the requests of ASIB protocol.
-                       
-                        if re_req is None: # If the message received does not match.
-                            client_sock.sendall(ERR_SYNTAX.encode())
-                            continue # As an invalid message was received continue to the next iteration.
-                        
-                        if int(re_req.group(1)) is EXIT_CODE:
-                            client_sock.sendall(GOODBYE_MSG.encode())
-                            break # Exit the loop as the user requested to exit.
-                        
-                        client_sock.sendall(create_response(re_req)) # If all is well, send the client its requested data.
-            except Exception as err:
-                print(f'{RED}[ERROR]: {WHITE}{err}')
-            finally:
-                print(f'{YELLOW}[NOTICE]: {WHITE}User has disconnected from the server.')
+                except ConnectionResetError or ConnectionAbortedError or ConnectionRefusedError as err:
+                    print(f'{RED}[ERROR]: {WHITE}{err}')
+        except Exception as err:
+            print(f'{RED}[ERROR]: {WHITE}{err}')
 
 
 
