@@ -4,16 +4,18 @@ import re
 SERVER_ADDRESS = ('127.0.0.1', 7160)
 
 # Base commands in ASIB without data as we just want to test if the server received them and identifies them appropriately.
-ASIB_COMMAND_FORMATS = ['200:ABMLIST',
-                        '207:SNGINABM&{0}',
-                        '214:SNGDUR&{0}',
-                        '221:SNGLYR&{0}',
-                        '228:ABMFROMSNG&{0}',
-                        '235:SNGBYNAME&{0}',
-                        '242:SNGBYLYR&{0}',
-                        '249:EXIT']
+ASIB_COMMAND_FORMATS = [
+    '200:ABMLIST',
+    '207:SNGINABM&{0}',
+    '214:SNGDUR&{0}',
+    '221:SNGLYR&{0}',
+    '228:ABMFROMSNG&{0}',
+    '235:SNGBYNAME&{0}',
+    '242:SNGBYLYR&{0}',
+    '249:EXIT'
+]
 
-ASIB_LYRICS_TYPE = 'SNGLYR'
+ASIB_SPECIAL_PRINT_TYPE = ['SNGLYR']
 
 CHOICE_MENU = """Please choose one of the following actions:
 [1] - Get list of albums.
@@ -35,7 +37,8 @@ RESULT_PRINT_FORMAT = {
     'SNGBYLYR': 'All songs that include keyword {Req} in its lyrics are:\n{Res}.',
 }
 
-RECV_LARGE = 2048 # The data passed may be bigger then the defualt recv size so we use a bigger buffer.
+# The data passed may be bigger then the defualt recv size so we use a bigger buffer.
+RECV_LARGE = 2048
 
 # Choice input msgs.
 CHOICE_INPUT_MSG = {
@@ -106,14 +109,18 @@ def create_request(choice: int) -> tuple:
         while True:
             try:
                 data = str(input(f'{GREEN}{CHOICE_INPUT_MSG[choice]}{WHITE}'))
-                break # Exit the loop as no exception has occured meaning data was inputted correctly.
+                if data == '':
+                    raise ValueError('Invalid input')
+                # Exit the loop as no exception has occured meaning data was inputted correctly.
+                break
             except ValueError or TypeError as err:
                 print(f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')
                 # As an invalid input was catched try getting the input again.
                 continue
 
     # Create the request msg.
-    request = ASIB_COMMAND_FORMATS[choice - 1].format(data).encode() # Step down the choice to fit the lists index.
+    # Step down the choice to fit the lists index.
+    request = ASIB_COMMAND_FORMATS[choice - 1].format(data).encode()
     return (request, data)
 
 
@@ -132,9 +139,9 @@ def print_response(requested_data: str, res: str) -> None:
     if re_response is not None:
         responce_data = re_response.group(2)
 
-        if re_response.group(1) == ASIB_LYRICS_TYPE:
-            # Filter out the response header and keep only data (take the last part of split and drop the first character '&').
-            responce_data = res.split(ASIB_LYRICS_TYPE)[-1][1:]
+        if re_response.group(1) in ASIB_SPECIAL_PRINT_TYPE:
+            # Filter out the response header and keep only data (by splitting at '&')
+            responce_data = res.split('&')[-1]
 
         else:
             # Filter out empty data and seperate the responce based on the 5th comma.
@@ -173,7 +180,7 @@ def main():
                 try:
                     try:
                         choice = int(input('Please make your choice: '))
-                        if choice < 1 or choice > 8:
+                        if choice < 1 or choice > EXIT_ACTION:
                             raise ValueError('Invalid choice')
                     except ValueError or TypeError:
                         print(f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')

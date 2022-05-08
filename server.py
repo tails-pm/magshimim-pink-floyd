@@ -17,10 +17,11 @@ REQ_COMMANDS = {
 
 WELCOME_MSG = 'Welcome to PinkFloyd Archive Server!\n'
 GOODBYE_MSG = 'Thank you for your time!\n'
-RES_FORMAT = 'OK:{0}&{1}\n'
+RES_FORMAT = 'OK:{0}&{1}'
 
-ERR_DB_FORMAT = "707:ERROR:UNKNOWN:\"{0}\" wasn't found.\n"
-ERR_SYNTAX = '700:ERROR:BADREQ:Invalid command was received.\n'
+ERR_SYNTAX = '700:ERROR:BADREQ:Invalid command was received.'
+ERR_DB_FORMAT = "707:ERROR:UNKNOWN:\"{0}\" wasn't found."
+
 
 EXIT_CODE = 249
 
@@ -31,18 +32,13 @@ EXIT_CODE = 249
         `:` matches the character ':'.
         Second capturing group `([A-Z]+)`:
             `[A-Z]+` one or more uppercase letters (case sensitive).
-        `:` matches the character ':'.
-        `(?:&(\w+(?: \w+)*))?')` Non capturing group meaning its not part of any capture group:
+        `(?:&(.+))?` Non capturing group meaning its not part of any capture group:
             `&` matches the character '&'.
-            Third capturing group `(\w+(?: \w+)*)`:
-                `\w+` one or more word characters.
-                `(?: \w+)` Non capturing group meaning it is part of the Third capture group:
-                    ` ` matches the character ' '.
-                    `\w+` one or more word characters.
-                `*` match Non capturing group zero or unlimted times.
+            Third capturing group `(.+)`:
+                `.+` matches any single character one or unlimted times.
         `?` match Non capturing group zero or one time.
 """
-REQ_PTRN = re.compile(r'(\d{3}):([A-Z]+)(?:&(\w+(?: \w+)*))?')
+REQ_PTRN = re.compile(r'(\d{3}):([A-Z]+)(?:&(.+))?')
 
 # These constants are only used for aestetic reasons, and has no effect in the codes structure.
 RED = '\033[91m'
@@ -51,7 +47,7 @@ WHITE = '\033[0m'
 GREEN = '\033[92m'
 
 
-def create_response(re_req : re.Pattern[str]) -> bytes:
+def create_response(re_req: re.Pattern[str]) -> bytes:
     """create_response creates the ASIB response for the client.
     
     Args:
@@ -60,12 +56,14 @@ def create_response(re_req : re.Pattern[str]) -> bytes:
     Returns:
         bytes: encoded ASIB response.
     """    
+    
     # Run the command of the clients ASIB request type and request data.
     db_data = REQ_COMMANDS.get(int(re_req.group(1)))(re_req.group(3))
 
-    if db_data is not None: # If the db_data was received properly set the response accordingly.
-        response = RES_FORMAT.format(re_req.group(2), db_data) 
-    else: # Otherwise set the response as an error response.
+    # If the db_data was received properly set the response accordingly.
+    if db_data is not None:
+        response = RES_FORMAT.format(re_req.group(2), db_data)
+    else:  # Otherwise set the response as an error response.
         response = ERR_DB_FORMAT.format(re_req.group(3))
 
     return response.encode()
@@ -85,8 +83,8 @@ def main():
                     
                     while True:
                         req = client_sock.recv(1024).decode()
-                        
-                        re_req = REQ_PTRN.search(req) # Check if the message received fits the requests of ASIB protocol.
+                        # Check if the message received fits the requests of ASIB protocol.
+                        re_req = REQ_PTRN.search(req)
                        
                         if re_req is None: # If the message received does not match.
                             client_sock.sendall(ERR_SYNTAX.encode())
@@ -94,13 +92,14 @@ def main():
                         
                         if int(re_req.group(1)) is EXIT_CODE:
                             client_sock.sendall(GOODBYE_MSG.encode())
-                            break # Exit the loop as the user requested to exit.
+                            break # Close the connection as the user requested to exit.
                         
                         client_sock.sendall(create_response(re_req)) # If all is well, send the client its requested data.
+                print(f'{YELLOW}[NOTICE]: {WHITE}User has disconnected from the server.')
+            except sock.error:
+                print(f'{YELLOW}[NOTICE]: {WHITE}User has disconnected from the server.')
             except Exception as err:
                 print(f'{RED}[ERROR]: {WHITE}{err}')
-            finally:
-                print(f'{YELLOW}[NOTICE]: {WHITE}User has disconnected from the server.')
 
 
 

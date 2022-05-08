@@ -2,6 +2,10 @@ import json
 import os
 from typing import Union # This module is used only for type hinting and no other purpose.
 
+ALBUM_PREFIX = '#'
+SONG_PREFIX = '*'
+SONG_DATA_SEPARATOR = '::'
+
 class data(): # Approval from elinor.
     """data class manages a db of pink_floyd with data from Pink_Floyd_DB.txt"""    
     def __init__(self):
@@ -26,13 +30,15 @@ class data(): # Approval from elinor.
 
         formatted_db = {}
         with open(filepath, 'r') as file:
-            album_list = sorted(file.read().split('#'))
+            # Split the files data based on '#' that is the prefix of each album.
+            album_list = sorted(file.read().split(ALBUM_PREFIX))
 
         del album_list[0] # delete the first index as its empty due to the file starting with '#'
-        # Split each album into its songs.
-        album_list = [album.split('*') for album in album_list]
-        # Split each song into its data.
-        album_list = [[song.split('::') for song in album] for album in album_list]
+
+        # Split each album into its songs based on '*' that is the prefix of each songs.
+        album_list = [album.split(SONG_PREFIX) for album in album_list]
+        # Split each song into its data based on '::' that seperates each data from one another.
+        album_list = [[song.split(SONG_DATA_SEPARATOR) for song in album] for album in album_list]
 
         for album in album_list:
             """We create a dict of all the songs in a given album.
@@ -48,25 +54,25 @@ class data(): # Approval from elinor.
             # Convert the dict into json format and save into a file.
             outfile.write(json.dumps(formatted_db, indent=5))
 
-    def get_albms(self, x = None) -> list:
+    def get_albms(self, x = None) -> str:
         """get_albms gets all album names in the database.
         
         Args:
             x: This argument is not used and is only made so we can pass an argument without error. Defaults to None.
         
         Returns:
-            list: list of albums in self.pink_floyd_db.
+            str: str of albums in self.pink_floyd_db.
         """        
         return ', '.join(self.pink_floyd_db.keys())
 
-    def get_albm_songs(self, album : str) -> Union[list, None]:
+    def get_albm_songs(self, album : str) -> Union[str, None]:
         """get_albm_songs gets all songs in a given album.
         
         Args:
             album (str): the album to get the songs from.
         
         Returns:
-            Union[list, None]: list: list of songs in the album.
+            Union[str, None]: str: all songs in the album.
                                None: if the album is not found in the database.
         """        
         return ', '.join(self.pink_floyd_db[album]['Songs'].keys()) if album in self.pink_floyd_db else None
@@ -95,7 +101,9 @@ class data(): # Approval from elinor.
                               None: if the song is not found in the database.
         """        
         album = self.find_songs_albm(song)
+
         if album is not None:
+            # Get the lyrics and convert it to a string.
             lyrics = self.pink_floyd_db[album]['Songs'][song]['Lyrics']
             return '\n'.join(lyrics) 
         else:
@@ -111,42 +119,48 @@ class data(): # Approval from elinor.
             Union[str, None]: str: the album name.
                               None: if the song is not found associated to an album in the database.
         """
+        # Go over each song in each album.
         for album in self.pink_floyd_db:
+            # Check if the song exists in the album.
             if song in self.pink_floyd_db[album]['Songs']:
                 return album
         return None
 
-    def songs_by_name(self, keyword : str) -> Union[list, None]:
+    def songs_by_name(self, keyword : str) -> Union[str, None]:
         """songs_by_name finds all songs that contain the keyword in its name.
         
         Args:
             keyword (str): the keyword to find in song names.
         
         Returns:
-            Union[list, None]: list: list of songs that contain the keyword.
-                               None: if no songs contain the keyword in the database.
+            Union[str, None]: str: str of songs that contain the keyword.
+                              None: if no songs contain the keyword in the database.
         """        
         songs = []
+        # Go over the name of each song in each album.
         for album in self.pink_floyd_db:
             for song in self.pink_floyd_db[album]['Songs']:
+                # Check if the name contain the keyword.
                 if keyword.lower() in song.lower():
                     songs.append(song)
 
         return None if not songs else ', '.join(songs)
 
-    def songs_by_lyr(self, keyword : str) -> Union[list, None]:
+    def songs_by_lyr(self, keyword : str) -> Union[str, None]:
         """songs_by_lyr finds all songs that contain the keyword in their lyrics.
         
         Args:
             keyword (str): the keyword to find in songs lyrics.
         
         Returns:
-            Union[list, None]: list: list of songs that contain the keyword in their lyrics.
-                               None: if no songs are contain the keyword in their lyrics in the database.
+            Union[str, None]: str: str of songs that contain the keyword in their lyrics.
+                              None: if no songs are contain the keyword in their lyrics in the database.
         """        
         songs = []
+        # Go over the lyrics of each song in each album.
         for album in self.pink_floyd_db:
             for song in self.pink_floyd_db[album]['Songs']:
+                # Check if the lyrics contain the keyword.
                 if keyword.lower() in self.get_song_lyr(song).lower():
                     songs.append(song)
 
