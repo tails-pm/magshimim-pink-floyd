@@ -7,7 +7,7 @@ from data import data
 LISTEN_PORT = 7160
 MAX_CLIENTS = 5
 
-DB = data() # Create the db object so we can create the list of commands.
+DB = data()  # Create the db object so we can create the list of commands.
 REQ_COMMANDS = {
     200: DB.get_albms,
     207: DB.get_albm_songs,
@@ -35,21 +35,18 @@ EXIT_CODE = 249
         `:` matches the character ':'.
         Second capturing group `([A-Z]+)`:
             `[A-Z]+` one or more uppercase letters (case sensitive).
-        `:` matches the character ':'.
-        `(?:&(\w+(?: \w+)*))?')` Non capturing group meaning its not part of any capture group:
+        `(?:&(.+))?` Non capturing group meaning its not part of any capture group:
             `&` matches the character '&'.
-            Third capturing group `(\w+(?: \w+)*)`:
-                `\w+` one or more word characters.
-                `(?: \w+)` Non capturing group meaning it is part of the Third capture group:
-                    ` ` matches the character ' '.
-                    `\w+` one or more word characters.
-                `*` match Non capturing group zero or unlimted times.
+            Third capturing group `(.+)`:
+                `.+` matches any single character one or unlimted times.
         `?` match Non capturing group zero or one time.
 """
-REQ_PTRN = re.compile(r'(\d{3}):([A-Z]+)(?:&(\w+(?: \w+)*))?')
+REQ_PTRN = re.compile(r'(\d{3}):([A-Z]+)(?:&(.+))?')
 
-HASH_PASSWORD = '7514b4069f27f8ca9080ec4ab6daedd0' # The password is ItayComeHome.
-unapproved_list = [] # Global list of sockets that are not yet allowed to log on to the server.
+# The password is ItayComeHome.
+HASH_PASSWORD = '7514b4069f27f8ca9080ec4ab6daedd0'
+# Global list of sockets that are not yet allowed to log on to the server.
+unapproved_list = []
 
 # These constants are only used for aestetic reasons, and has no effect in the codes structure.
 RED = '\033[91m'
@@ -60,7 +57,7 @@ GREEN = '\033[92m'
 
 def login(sock: sock.socket, client_pass: bytes) -> None:
     """login verifies if the clients pass is valid.
-    
+
     If password found valid, then the client is removed from the unapproved_list.
     Otherwise we continue as is.
 
@@ -68,27 +65,30 @@ def login(sock: sock.socket, client_pass: bytes) -> None:
         sock (sock.socket): clients socket.
         client_pass (bytes): the clients password sent.
     """
-    if hashlib.md5(client_pass).hexdigest() == HASH_PASSWORD:  
+    if hashlib.md5(client_pass).hexdigest() == HASH_PASSWORD:
         unapproved_list.remove(sock)
-        sock.sendall("OK".encode())  
+        sock.sendall("OK".encode())
     else:
         sock.sendall(ERR_PASS.encode())
 
-def create_response(re_req : re.Pattern[str]) -> bytes:
+
+def create_response(re_req: re.Pattern[str]) -> bytes:
     """create_response creates the ASIB response for the client.
-    
+
     Args:
         re_req (re.Pattern[str]): the regex match of the clients ASIB request.
-    
+
     Returns:
         bytes: encoded ASIB response.
-    """    
+    """
+    
     # Run the command of the clients ASIB request type and request data.
     db_data = REQ_COMMANDS.get(int(re_req.group(1)))(re_req.group(3))
 
-    if db_data is not None: # If the db_data was received properly set the response accordingly.
-        response = RES_FORMAT.format(re_req.group(2), db_data) 
-    else: # Otherwise set the response as an error response.
+    # If the db_data was received properly set the response accordingly.
+    if db_data is not None:
+        response = RES_FORMAT.format(re_req.group(2), db_data)
+    else:  # Otherwise set the response as an error response.
         response = ERR_DB_FORMAT.format(re_req.group(3))
 
     return response.encode()
@@ -103,43 +103,50 @@ def main():
         try:
             while True:
                 try:
-                    read_sockets, write_sockets, error_sockets = select.select(connections_list, [], [])
-                    for read_sock in read_sockets: # Move over each socket.
+                    read_sockets, write_sockets, error_sockets = select.select(
+                        connections_list, [], [])
+                    for read_sock in read_sockets:  # Move over each socket.
                         if read_sock == listening_sock:
                             client_sock, client_addr = listening_sock.accept()
-                            print(f'{GREEN}[NOTICE]: {WHITE}User has connected to the server.')
-                            client_sock.sendall(WELCOME_MSG.encode()) # Send Welcome message.
+                            print(
+                                f'{GREEN}[NOTICE]: {WHITE}User has connected to the server.')
+                            # Send Welcome message.
+                            client_sock.sendall(WELCOME_MSG.encode())
                             connections_list.append(client_sock)
                             unapproved_list.append(client_sock)
                         else:
                             try:
                                 req = read_sock.recv(1024)
-                                
+
                                 if read_sock in unapproved_list:
                                     login(read_sock, req)
                                     continue
-                                
-                                re_req = REQ_PTRN.search(req.decode()) # Check if the message received fits the requests of ASIB protocol.
-                            
-                                if re_req is None: # If the message received does not match.
+
+                                # Check if the message received fits the requests of ASIB protocol.
+                                re_req = REQ_PTRN.search(req.decode())
+
+                                if re_req is None:  # If the message received does not match.
                                     read_sock.sendall(ERR_SYNTAX.encode())
-                                    continue # As an invalid message was received continue to the next iteration.
-                                
+                                    # As an invalid message was received continue to the next iteration.
+                                    continue
+
                                 if int(re_req.group(1)) is EXIT_CODE:
                                     read_sock.sendall(GOODBYE_MSG.encode())
                                     continue
-                                
-                                read_sock.sendall(create_response(re_req)) # If all is well, send the client its requested data.
+
+                                # If all is well, send the client its requested data.
+                                read_sock.sendall(create_response(re_req))
                             except sock.error:
-                                print(f'{YELLOW}[NOTICE]: {WHITE}User has disconnected from the server.')
-                                read_sock.close() # End the socket as the user had disconnected.
+                                print(
+                                    f'{YELLOW}[NOTICE]: {WHITE}User has disconnected from the server.')
+                                # End the socket as the user had disconnected.
+                                read_sock.close()
                                 connections_list.remove(read_sock)
 
                 except ConnectionResetError or ConnectionAbortedError or ConnectionRefusedError as err:
                     print(f'{RED}[ERROR]: {WHITE}{err}')
         except Exception as err:
             print(f'{RED}[ERROR]: {WHITE}{err}')
-
 
 
 if __name__ == "__main__":

@@ -35,7 +35,8 @@ RESULT_PRINT_FORMAT = {
     'SNGBYLYR': 'All songs that include keyword {Req} in its lyrics are:\n{Res}.',
 }
 
-RECV_LARGE = 2048 # The data passed may be bigger then the defualt recv size so we use a bigger buffer.
+# The data passed may be bigger then the defualt recv size so we use a bigger buffer.
+RECV_LARGE = 2048
 
 # Choice input msgs.
 CHOICE_INPUT_MSG = {
@@ -94,13 +95,13 @@ GREEN = '\033[92m'
 
 def create_request(choice: int) -> tuple:
     """create_request creates the ASIB request baased on the users choice and data.
-    
+
     Args:
         choice (int): the user's choice of action.
-    
+
     Returns:
         tuple: (request - The finalized ASIB request, data - the data that the user inputted).
-    """    
+    """
     data = ''
 
     # Check if the choice is part of the CHOICE_INPUT_MSG dict as we want to get input only for request that require it.
@@ -108,27 +109,33 @@ def create_request(choice: int) -> tuple:
         while True:
             try:
                 data = str(input(f'{GREEN}{CHOICE_INPUT_MSG[choice]}{WHITE}'))
-                break # Exit the loop as no exception has occured meaning data was inputted correctly.
+                if data == '':
+                    raise ValueError('Invalid input')
+                # Exit the loop as no exception has occured meaning data was inputted correctly.
+                break
             except ValueError or TypeError as err:
-                print(f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')
+                print(
+                    f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')
                 # As an invalid input was catched try getting the input again.
                 continue
 
     # Create the request msg.
-    request = ASIB_COMMAND_FORMATS[choice - 1].format(data).encode() # Step down the choice to fit the lists index.
+    # Step down the choice to fit the lists index.
+    request = ASIB_COMMAND_FORMATS[choice - 1].format(data).encode()
     return (request, data)
 
 
 def print_response(requested_data: str, res: str) -> None:
     """print_response creates a pretty print from the servers ASIB response.
-    
+
     Made for astetic reasons!!!
 
     Args:
         requested_data (str): the users requested data.
         res (str): the server's ASIB response.
-    """    
-    re_response = RES_PTRN.search(res) # Match the response to the regex pattern.
+    """
+    re_response = RES_PTRN.search(
+        res)  # Match the response to the regex pattern.
 
     # If the servers response does not match an error command print normally.
     if re_response is not None:
@@ -140,21 +147,25 @@ def print_response(requested_data: str, res: str) -> None:
 
         else:
             # Filter out empty data and seperate the responce based on the 5th comma.
-            responce_data = list(filter(None, FORTH_COMMA_PTRN.findall(re_response.group(2))))
+            responce_data = list(
+                filter(None, FORTH_COMMA_PTRN.findall(re_response.group(2))))
             # Create a list of lines with the last to characters removed if the last two characters are ', '.
-            responce_data = [line[:-2] if line[-2:-1] == ', ' else line for line in responce_data]
+            responce_data = [line[:-2] if line[-2:-1] ==
+                             ', ' else line for line in responce_data]
             # Join each line with '\n'.
             responce_data = '\n'.join(responce_data)
 
         # Create the response message dependend on the response type.
-        responce_data = RESULT_PRINT_FORMAT[re_response.group(1)].format(Req=requested_data, Res=responce_data)
+        responce_data = RESULT_PRINT_FORMAT[re_response.group(
+            1)].format(Req=requested_data, Res=responce_data)
         print(f'{GREEN}[SERVER]: {WHITE}{responce_data}\n')
 
     # Check if the servers response is an error.
     elif ERROR_PTRN.search(res) is not None:
-        re_response = ERROR_PTRN.search(res) # Match the error.
+        re_response = ERROR_PTRN.search(res)  # Match the error.
         # Print the error message based on each header of the error response.
-        print(f'{RED}[ERROR {re_response.group(1)}]: {YELLOW}{re_response.group(2)}: {WHITE}{re_response.group(3)}')
+        print(
+            f'{RED}[ERROR {re_response.group(1)}]: {YELLOW}{re_response.group(2)}: {WHITE}{re_response.group(3)}')
 
     # If somehow the server returns a msg not recognized in the ASIB protocol print it as is.
     else:
@@ -163,13 +174,13 @@ def print_response(requested_data: str, res: str) -> None:
 
 def login_to_server(server_sock: sock.socket) -> bool:
     """login_to_server requests user 3 times for a password and checks if the server returns a valid response.
-    
+
     Args:
         server_sock (sock.socket): the socket with the server.
-    
+
     Returns:
         bool: True if the client has guessed the correct password in three attempts. Otherwise False.
-    """    
+    """
     for i in range(MAX_PASS_ATTEMPTS):
         try:
             try:
@@ -177,24 +188,28 @@ def login_to_server(server_sock: sock.socket) -> bool:
                 server_sock.sendall(password.encode())
                 response = server_sock.recv(RECV_LARGE).decode()
 
-                if ERROR_PTRN.search(response) is None: # If the response is not an error, return True.
+                # If the response is not an error, return True.
+                if ERROR_PTRN.search(response) is None:
                     return True
                 else:
                     print_response(None, response)
             except ValueError or TypeError:
-                print(f'{YELLOW}[WARNING]: {WHITE}Invalid Input, please try again.')
+                print(
+                    f'{YELLOW}[WARNING]: {WHITE}Invalid Input, please try again.')
                 # As an invalid input was catched try getting the input again.
                 continue
         except KeyboardInterrupt:
-            print(f'{YELLOW}[WARNING]: {WHITE}Keyboard interrupted, please try again.')
-    return False # If the loop has ended it means that the client unsuccesfully guessed the password.
+            print(
+                f'{YELLOW}[WARNING]: {WHITE}Keyboard interrupted, please try again.')
+    # If the loop has ended it means that the client unsuccesfully guessed the password.
+    return False
 
 
 def main():
     with sock.socket(sock.AF_INET, sock.SOCK_STREAM) as server_sock:
         try:
             server_sock.connect(SERVER_ADDRESS)
-        
+
             welcome = server_sock.recv(1024).decode()
             # Print Welcome Message.
             print(f'{GREEN}[SERVER]: {WHITE}{welcome}')
@@ -209,7 +224,8 @@ def main():
                         if choice < 1 or choice > 8:
                             raise ValueError('Invalid choice')
                     except ValueError or TypeError:
-                        print(f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')
+                        print(
+                            f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')
                         # As an invalid input was catched try getting the input again.
                         continue
 
@@ -224,10 +240,12 @@ def main():
                     if choice == EXIT_ACTION:
                         break  # Exit the loop as the user requested to exit.
                 except KeyboardInterrupt:
-                    print(f'{YELLOW}[WARNING]: {WHITE}Keyboard interrupted, please try again.')
+                    print(
+                        f'{YELLOW}[WARNING]: {WHITE}Keyboard interrupted, please try again.')
 
         except sock.error:
-            print(f'{RED}[PROCESS STOPPED]: {WHITE}Communication with the server has failed/ended, goodbye.')
+            print(
+                f'{RED}[PROCESS STOPPED]: {WHITE}Communication with the server has failed/ended, goodbye.')
         except Exception as err:
             print(f'{RED}[PROCESS STOPPED]: {WHITE}{err}')
 
