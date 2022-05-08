@@ -4,16 +4,20 @@ import re
 SERVER_ADDRESS = ('127.0.0.1', 7160)
 
 # Base commands in ASIB without data as we just want to test if the server received them and identifies them appropriately.
-ASIB_COMMAND_FORMATS = ['200:ABMLIST',
-                        '207:SNGINABM&{0}',
-                        '214:SNGDUR&{0}',
-                        '221:SNGLYR&{0}',
-                        '228:ABMFROMSNG&{0}',
-                        '235:SNGBYNAME&{0}',
-                        '242:SNGBYLYR&{0}',
-                        '249:EXIT']
+ASIB_COMMAND_FORMATS = [
+    '200:ABMLIST',
+    '207:SNGINABM&{0}',
+    '214:SNGDUR&{0}',
+    '221:SNGLYR&{0}',
+    '228:ABMFROMSNG&{0}',
+    '235:SNGBYNAME&{0}',
+    '242:SNGBYLYR&{0}',
+    '249:EXIT',
+    '256:FIVEMOSTCOM',
+    '263:ABMBYDUR'
+]
 
-ASIB_LYRICS_TYPE = 'SNGLYR'
+ASIB_SPECIAL_PRINT_TYPE = ['SNGLYR', 'FIVEMOSTCOM', 'ABMBYDUR']
 
 CHOICE_MENU = """Please choose one of the following actions:
 [1] - Get list of albums.
@@ -21,9 +25,11 @@ CHOICE_MENU = """Please choose one of the following actions:
 [3] - Get the duration of a song.
 [4] - Get the lyrics of a song.
 [5] - Get the album of a song.
-[6] - Get all songs' names that include the specified word.
+[6] - Get all songs names that include the specified word.
 [7] - Get all songs that include the specified word in its lyrics.
-[8] - Exit."""
+[8] - Exit.
+[9] - Get fifty most common words in all songs lyrics.
+[10] - Get ranking of each album based on its duration."""
 
 RESULT_PRINT_FORMAT = {
     'ABMLIST': 'Pink Floyd list of albums:\n{Res}.',
@@ -33,9 +39,12 @@ RESULT_PRINT_FORMAT = {
     'ABMFROMSNG': '{Req} is in the album:\n{Res}.',
     'SNGBYNAME': 'All songs that include keyword {Req} are:\n{Res}.',
     'SNGBYLYR': 'All songs that include keyword {Req} in its lyrics are:\n{Res}.',
+    'FIVEMOSTCOM': 'Fifty most common words in all songs lyrics are:\n{Res}',
+    'ABMBYDUR': "The ranking of the albums based on it's duration is:\n{Res}"
 }
 
-RECV_LARGE = 2048 # The data passed may be bigger then the defualt recv size so we use a bigger buffer.
+# The data passed may be bigger then the defualt recv size so we use a bigger buffer.
+RECV_LARGE = 2048
 
 # Choice input msgs.
 CHOICE_INPUT_MSG = {
@@ -47,6 +56,7 @@ CHOICE_INPUT_MSG = {
     7: 'Please enter your desired keyword to search by (case insensitive): '
 }
 EXIT_ACTION = 8
+BONUS_END_ACTION = 10
 
 # Regex patterns.
 """The pattern will match to a string if it has the following pattern:
@@ -83,6 +93,8 @@ RES_PTRN = re.compile(r'OK:([A-Z]+)(?:&(.+))?')
 """
 FORTH_COMMA_PTRN = re.compile(r'(?:[^,]*(?:, )?){4}')
 
+MAX_PASS_ATTEMPTS = 3
+
 # These constants are only used for aestetic reasons, and has no effect in the codes structure.
 RED = '\033[91m'
 YELLOW = '\033[93m'
@@ -92,13 +104,13 @@ GREEN = '\033[92m'
 
 def create_request(choice: int) -> tuple:
     """create_request creates the ASIB request baased on the users choice and data.
-    
+
     Args:
         choice (int): the user's choice of action.
-    
+
     Returns:
         tuple: (request - The finalized ASIB request, data - the data that the user inputted).
-    """    
+    """
     data = ''
 
     # Check if the choice is part of the CHOICE_INPUT_MSG dict as we want to get input only for request that require it.
@@ -106,35 +118,39 @@ def create_request(choice: int) -> tuple:
         while True:
             try:
                 data = str(input(f'{GREEN}{CHOICE_INPUT_MSG[choice]}{WHITE}'))
-                break # Exit the loop as no exception has occured meaning data was inputted correctly.
+                if data == '':
+                    raise ValueError('Invalid input')
+                # Exit the loop as no exception has occured meaning data was inputted correctly.
+                break
             except ValueError or TypeError as err:
                 print(f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')
                 # As an invalid input was catched try getting the input again.
                 continue
 
     # Create the request msg.
-    request = ASIB_COMMAND_FORMATS[choice - 1].format(data).encode() # Step down the choice to fit the lists index.
+    # Step down the choice to fit the lists index.
+    request = ASIB_COMMAND_FORMATS[choice - 1].format(data).encode()
     return (request, data)
 
 
 def print_response(requested_data: str, res: str) -> None:
     """print_response creates a pretty print from the servers ASIB response.
-    
+
     Made for astetic reasons!!!
 
     Args:
         requested_data (str): the users requested data.
         res (str): the server's ASIB response.
-    """    
-    re_response = RES_PTRN.search(res) # Match the response to the regex pattern.
+    """
+    re_response = RES_PTRN.search(res)  # Match the response to the regex pattern.
 
     # If the servers response does not match an error command print normally.
     if re_response is not None:
         responce_data = re_response.group(2)
 
-        if re_response.group(1) == ASIB_LYRICS_TYPE:
-            # Filter out the response header and keep only data (take the last part of split and drop the first character '&').
-            responce_data = res.split(ASIB_LYRICS_TYPE)[-1][1:]
+        if re_response.group(1) in ASIB_SPECIAL_PRINT_TYPE:
+            # Filter out the response header and keep only data (by splitting at '&')
+            responce_data = res.split('&')[-1]
 
         else:
             # Filter out empty data and seperate the responce based on the 5th comma.
@@ -150,7 +166,7 @@ def print_response(requested_data: str, res: str) -> None:
 
     # Check if the servers response is an error.
     elif ERROR_PTRN.search(res) is not None:
-        re_response = ERROR_PTRN.search(res) # Match the error.
+        re_response = ERROR_PTRN.search(res)  # Match the error.
         # Print the error message based on each header of the error response.
         print(f'{RED}[ERROR {re_response.group(1)}]: {YELLOW}{re_response.group(2)}: {WHITE}{re_response.group(3)}')
 
@@ -159,21 +175,53 @@ def print_response(requested_data: str, res: str) -> None:
         print(f'{GREEN}[SERVER]: {WHITE}{res}')
 
 
+def login_to_server(server_sock: sock.socket) -> bool:
+    """login_to_server requests user 3 times for a password and checks if the server returns a valid response.
+
+    Args:
+        server_sock (sock.socket): the socket with the server.
+
+    Returns:
+        bool: True if the client has guessed the correct password in three attempts. Otherwise False.
+    """
+    for i in range(MAX_PASS_ATTEMPTS):
+        try:
+            password = input('Please enter the password: ')
+            server_sock.sendall(password.encode())
+            response = server_sock.recv(RECV_LARGE).decode()
+
+            # If the response is not an error, return True.
+            if ERROR_PTRN.search(response) is None:
+                return True
+            else:
+                print_response(None, response)
+        except ValueError or TypeError:
+            print(f'{YELLOW}[WARNING]: {WHITE}Invalid Input, please try again.')
+            # As an invalid input was catched try getting the input again.
+            continue
+        except KeyboardInterrupt:
+            print(f'{YELLOW}[WARNING]: {WHITE}Keyboard interrupted, please try again.')
+    # If the loop has ended it means that the client unsuccesfully guessed the password.
+    return False
+
+
 def main():
     with sock.socket(sock.AF_INET, sock.SOCK_STREAM) as server_sock:
         try:
             server_sock.connect(SERVER_ADDRESS)
-        
+
             welcome = server_sock.recv(1024).decode()
             # Print Welcome Message.
             print(f'{GREEN}[SERVER]: {WHITE}{welcome}')
 
+            if not login_to_server(server_sock):
+                raise Exception('Too many attempts, please try again later.')
             while True:
                 print(CHOICE_MENU)
                 try:
                     try:
                         choice = int(input('Please make your choice: '))
-                        if choice < 1 or choice > 8:
+                        if choice < 1 or choice > BONUS_END_ACTION:
                             raise ValueError('Invalid choice')
                     except ValueError or TypeError:
                         print(f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')
