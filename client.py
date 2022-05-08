@@ -117,6 +117,10 @@ def create_request(choice: int) -> tuple:
                 print(f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')
                 # As an invalid input was catched try getting the input again.
                 continue
+            except KeyboardInterrupt:
+                print(f'{YELLOW}[WARNING]: {WHITE}Keyboard interrupted, please try again.')
+                # As an KeyboardInterrupt was catched try getting the input again.
+                continue
 
     # Create the request msg.
     # Step down the choice to fit the lists index.
