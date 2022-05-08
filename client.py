@@ -4,16 +4,20 @@ import re
 SERVER_ADDRESS = ('127.0.0.1', 7160)
 
 # Base commands in ASIB without data as we just want to test if the server received them and identifies them appropriately.
-ASIB_COMMAND_FORMATS = ['200:ABMLIST',
-                        '207:SNGINABM&{0}',
-                        '214:SNGDUR&{0}',
-                        '221:SNGLYR&{0}',
-                        '228:ABMFROMSNG&{0}',
-                        '235:SNGBYNAME&{0}',
-                        '242:SNGBYLYR&{0}',
-                        '249:EXIT']
+ASIB_COMMAND_FORMATS = [
+    '200:ABMLIST',
+    '207:SNGINABM&{0}',
+    '214:SNGDUR&{0}',
+    '221:SNGLYR&{0}',
+    '228:ABMFROMSNG&{0}',
+    '235:SNGBYNAME&{0}',
+    '242:SNGBYLYR&{0}',
+    '249:EXIT',
+    '256:FIVEMOSTCOM',
+    '263:ABMBYDUR'
+]
 
-ASIB_LYRICS_TYPE = 'SNGLYR'
+ASIB_SPECIAL_PRINT_TYPE = ['SNGLYR', 'FIVEMOSTCOM', 'ABMBYDUR']
 
 CHOICE_MENU = """Please choose one of the following actions:
 [1] - Get list of albums.
@@ -21,9 +25,11 @@ CHOICE_MENU = """Please choose one of the following actions:
 [3] - Get the duration of a song.
 [4] - Get the lyrics of a song.
 [5] - Get the album of a song.
-[6] - Get all songs' names that include the specified word.
+[6] - Get all songs names that include the specified word.
 [7] - Get all songs that include the specified word in its lyrics.
-[8] - Exit."""
+[8] - Exit.
+[9] - Get fifty most common words in all songs lyrics.
+[10] - Get ranking of each album based on its duration."""
 
 RESULT_PRINT_FORMAT = {
     'ABMLIST': 'Pink Floyd list of albums:\n{Res}.',
@@ -33,6 +39,8 @@ RESULT_PRINT_FORMAT = {
     'ABMFROMSNG': '{Req} is in the album:\n{Res}.',
     'SNGBYNAME': 'All songs that include keyword {Req} are:\n{Res}.',
     'SNGBYLYR': 'All songs that include keyword {Req} in its lyrics are:\n{Res}.',
+    'FIVEMOSTCOM': 'Fifty most common words in all songs lyrics are:\n{Res}',
+    'ABMBYDUR': "The ranking of the albums based on it's duration is:\n{Res}"
 }
 
 # The data passed may be bigger then the defualt recv size so we use a bigger buffer.
@@ -48,6 +56,7 @@ CHOICE_INPUT_MSG = {
     7: 'Please enter your desired keyword to search by (case insensitive): '
 }
 EXIT_ACTION = 8
+BONUS_END_ACTION = 10
 
 # Regex patterns.
 """The pattern will match to a string if it has the following pattern:
@@ -114,8 +123,7 @@ def create_request(choice: int) -> tuple:
                 # Exit the loop as no exception has occured meaning data was inputted correctly.
                 break
             except ValueError or TypeError as err:
-                print(
-                    f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')
+                print(f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')
                 # As an invalid input was catched try getting the input again.
                 continue
 
@@ -140,9 +148,9 @@ def print_response(requested_data: str, res: str) -> None:
     if re_response is not None:
         responce_data = re_response.group(2)
 
-        if re_response.group(1) == ASIB_LYRICS_TYPE:
-            # Filter out the response header and keep only data (take the last part of split and drop the first character '&').
-            responce_data = res.split(ASIB_LYRICS_TYPE)[-1][1:]
+        if re_response.group(1) in ASIB_SPECIAL_PRINT_TYPE:
+            # Filter out the response header and keep only data (by splitting at '&')
+            responce_data = res.split('&')[-1]
 
         else:
             # Filter out empty data and seperate the responce based on the 5th comma.
@@ -178,20 +186,19 @@ def login_to_server(server_sock: sock.socket) -> bool:
     """
     for i in range(MAX_PASS_ATTEMPTS):
         try:
-            try:
-                password = input('Please enter the password: ')
-                server_sock.sendall(password.encode())
-                response = server_sock.recv(RECV_LARGE).decode()
+            password = input('Please enter the password: ')
+            server_sock.sendall(password.encode())
+            response = server_sock.recv(RECV_LARGE).decode()
 
-                # If the response is not an error, return True.
-                if ERROR_PTRN.search(response) is None:
-                    return True
-                else:
-                    print_response(None, response)
-            except ValueError or TypeError:
-                print(f'{YELLOW}[WARNING]: {WHITE}Invalid Input, please try again.')
-                # As an invalid input was catched try getting the input again.
-                continue
+            # If the response is not an error, return True.
+            if ERROR_PTRN.search(response) is None:
+                return True
+            else:
+                print_response(None, response)
+        except ValueError or TypeError:
+            print(f'{YELLOW}[WARNING]: {WHITE}Invalid Input, please try again.')
+            # As an invalid input was catched try getting the input again.
+            continue
         except KeyboardInterrupt:
             print(f'{YELLOW}[WARNING]: {WHITE}Keyboard interrupted, please try again.')
     # If the loop has ended it means that the client unsuccesfully guessed the password.
@@ -214,7 +221,7 @@ def main():
                 try:
                     try:
                         choice = int(input('Please make your choice: '))
-                        if choice < 1 or choice > 8:
+                        if choice < 1 or choice > BONUS_END_ACTION:
                             raise ValueError('Invalid choice')
                     except ValueError or TypeError:
                         print(f'{YELLOW}[WARNING]: {WHITE}Invalid input, please try again.')

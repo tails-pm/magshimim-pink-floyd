@@ -15,7 +15,9 @@ REQ_COMMANDS = {
     221: DB.get_song_lyr,
     228: DB.find_songs_albm,
     235: DB.songs_by_name,
-    242: DB.songs_by_lyr
+    242: DB.songs_by_lyr,
+    256: DB.fifty_most_common,
+    263: DB.albm_by_dur
 }
 
 WELCOME_MSG = 'Welcome to PinkFloyd Archive Server!\n'
@@ -116,7 +118,9 @@ def main():
                             try:
                                 req = read_sock.recv(1024)
 
+                                # Check if the client has not been accepted yet.
                                 if read_sock in unapproved_list:
+                                    # Check if the client has sent a correct password.
                                     login(read_sock, req)
                                     continue
 
@@ -125,7 +129,6 @@ def main():
 
                                 if re_req is None:  # If the message received does not match.
                                     read_sock.sendall(ERR_SYNTAX.encode())
-                                    # As an invalid message was received continue to the next iteration.
                                     continue
 
                                 if int(re_req.group(1)) is EXIT_CODE:

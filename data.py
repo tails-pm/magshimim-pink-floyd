@@ -1,10 +1,14 @@
 import json
 import os
+import datetime as dt
 from typing import Union # This module is used only for type hinting and no other purpose.
 
 ALBUM_PREFIX = '#'
 SONG_PREFIX = '*'
 SONG_DATA_SEPARATOR = '::'
+TIME_ZERO = dt.datetime.strptime('00:00:00', '%H:%M:%S') # Used when calculating time sum.
+TOP_COMMON_COUNT = 50
+
 class data(): # Approval from elinor.
     """data class manages a db of pink_floyd with data from Pink_Floyd_DB.txt"""    
     def __init__(self):
@@ -53,25 +57,25 @@ class data(): # Approval from elinor.
             # Convert the dict into json format and save into a file.
             outfile.write(json.dumps(formatted_db, indent=5))
 
-    def get_albms(self, x = None) -> list:
+    def get_albms(self, x = None) -> str:
         """get_albms gets all album names in the database.
         
         Args:
             x: This argument is not used and is only made so we can pass an argument without error. Defaults to None.
         
         Returns:
-            list: list of albums in self.pink_floyd_db.
+            str: str of albums in self.pink_floyd_db.
         """        
         return ', '.join(self.pink_floyd_db.keys())
 
-    def get_albm_songs(self, album : str) -> Union[list, None]:
+    def get_albm_songs(self, album : str) -> Union[str, None]:
         """get_albm_songs gets all songs in a given album.
         
         Args:
             album (str): the album to get the songs from.
         
         Returns:
-            Union[list, None]: list: list of songs in the album.
+            Union[str, None]: str: all songs in the album.
                                None: if the album is not found in the database.
         """        
         return ', '.join(self.pink_floyd_db[album]['Songs'].keys()) if album in self.pink_floyd_db else None
@@ -100,7 +104,9 @@ class data(): # Approval from elinor.
                               None: if the song is not found in the database.
         """        
         album = self.find_songs_albm(song)
+
         if album is not None:
+            # Get the lyrics and convert it to a string.
             lyrics = self.pink_floyd_db[album]['Songs'][song]['Lyrics']
             return '\n'.join(lyrics) 
         else:
@@ -116,46 +122,116 @@ class data(): # Approval from elinor.
             Union[str, None]: str: the album name.
                               None: if the song is not found associated to an album in the database.
         """
+        # Go over each song in each album.
         for album in self.pink_floyd_db:
+            # Check if the song exists in the album.
             if song in self.pink_floyd_db[album]['Songs']:
                 return album
         return None
 
-    def songs_by_name(self, keyword : str) -> Union[list, None]:
+    def songs_by_name(self, keyword : str) -> Union[str, None]:
         """songs_by_name finds all songs that contain the keyword in its name.
         
         Args:
             keyword (str): the keyword to find in song names.
         
         Returns:
-            Union[list, None]: list: list of songs that contain the keyword.
+            Union[str, None]: str: str of songs that contain the keyword.
                                None: if no songs contain the keyword in the database.
         """        
         songs = []
+        # Go over the name of each song in each album.
         for album in self.pink_floyd_db:
             for song in self.pink_floyd_db[album]['Songs']:
+                # Check if the name contain the keyword.
                 if keyword.lower() in song.lower():
                     songs.append(song)
 
         return None if not songs else ', '.join(songs)
 
-    def songs_by_lyr(self, keyword : str) -> Union[list, None]:
+    def songs_by_lyr(self, keyword : str) -> Union[str, None]:
         """songs_by_lyr finds all songs that contain the keyword in their lyrics.
         
         Args:
             keyword (str): the keyword to find in songs lyrics.
         
         Returns:
-            Union[list, None]: list: list of songs that contain the keyword in their lyrics.
+            Union[str, None]: str: str of songs that contain the keyword in their lyrics.
                                None: if no songs are contain the keyword in their lyrics in the database.
         """        
         songs = []
+        # Go over the lyrics of each song in each album.
         for album in self.pink_floyd_db:
             for song in self.pink_floyd_db[album]['Songs']:
+                # Check if the lyrics contain the keyword.
                 if keyword.lower() in self.get_song_lyr(song).lower():
                     songs.append(song)
 
         return None if not songs else ', '.join(songs)
 
-
+    def fifty_most_common(self, x = None) -> str:
+        """fifty_most_common find the fifty most common words in each song in each album in the database.
+        
+        Args:
+            x: This argument is not used and is only made so we can pass an argument without error. Defaults to None.
+        
+        Returns:
+            str: fifty most common words the lyrics of all songs in pink_floyd_db, format '<rank>. <word>:<occurence>'.
+        """     
+        common_words = {}
+        # Go over each word in each lyrics of each song in each album.
+        for album in self.pink_floyd_db:
+            for song, song_data in self.pink_floyd_db[album]['Songs'].items():
+                for line in song_data['Lyrics']:
+                    for word in line.split(' '):
+                        # Continue if the word is not alphanumeric.
+                        if not word.isalpha():
+                            continue
+                        # Try to add one to a key, if KeyError was raised set that key as one.
+                        try:
+                            common_words[word.lower()] += 1
+                        except KeyError:
+                            common_words[word.lower()] = 1
+        # Sort ascending the dictionary based on size of values.
+        top_50_common = dict(sorted(common_words.items(), key=lambda item: item[1], reverse=True)[:TOP_COMMON_COUNT])
+        
+        db_msg = [] # List of each ranking of words, used later to add easily the newlines.
+        # Create ranking msg for each word.
+        for cnt, (word, occur) in enumerate(top_50_common.items()):
+           db_msg += ['{0}. {1}: {2}'.format(cnt + 1, word, occur)]
+        return '\n'.join(db_msg) # Add the newline between each ranking.
+    
+    def albm_by_dur(self, x = None) -> str:
+        """albm_by_dur gets each albums total duration and sorts them by size.
+        
+        Args:
+            x: This argument is not used and is only made so we can pass an argument without error. Defaults to None.
+        
+        Returns:
+            str: ranking of each album based on duration, format '<rank>. <album>:<duration>'.
+        """        
+        album_durations = {}
+        # Go over the duration of each song in each album
+        for album in self.pink_floyd_db:
+            album_time = dt.datetime.strptime('00:00:00', '%H:%M:%S') # Empty the timestamp for the album.
+            for song, song_data in self.pink_floyd_db[album]['Songs'].items():
+                # Convert the duration to time() object.
+                cur_time = dt.datetime.strptime(song_data['Duration'], '%M:%S')
+                # Convert the time() object back to a string but with a new format.
+                cur_time = cur_time.strftime('%H:%M:%S')
+                # Convert the new string format back to a time() object.
+                cur_time = dt.datetime.strptime(cur_time, '%H:%M:%S')
+                
+                # Add the duration to the current duration sum of the album.
+                album_time = (album_time - TIME_ZERO + cur_time)
+            album_durations[album] = album_time # Add the album duration to the dict with its name as the key.
+        
+        # Sort ascending the dictionary based on size of values
+        album_durations = dict(sorted(album_durations.items(), key=lambda item: item[1], reverse=True))
+        
+        db_msg = []# List of each ranking of words, used later to add easily the newlines.
+        # Create ranking msg for each word.
+        for cnt, (album, album_dur) in enumerate(album_durations.items()):
+            db_msg += ['{0}. {1}: {2}'.format(cnt + 1, album, album_dur.strftime('%H:%M:%S'))]
+        return '\n'.join(db_msg) # Add the newline between each ranking.
 
