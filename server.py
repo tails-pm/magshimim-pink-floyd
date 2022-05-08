@@ -103,13 +103,11 @@ def main():
         try:
             while True:
                 try:
-                    read_sockets, write_sockets, error_sockets = select.select(
-                        connections_list, [], [])
+                    read_sockets, write_sockets, error_sockets = select.select(connections_list, [], [])
                     for read_sock in read_sockets:  # Move over each socket.
                         if read_sock == listening_sock:
                             client_sock, client_addr = listening_sock.accept()
-                            print(
-                                f'{GREEN}[NOTICE]: {WHITE}User has connected to the server.')
+                            print(f'{GREEN}[NOTICE]: {WHITE}User has connected to the server.')
                             # Send Welcome message.
                             client_sock.sendall(WELCOME_MSG.encode())
                             connections_list.append(client_sock)
@@ -137,8 +135,7 @@ def main():
                                 # If all is well, send the client its requested data.
                                 read_sock.sendall(create_response(re_req))
                             except sock.error:
-                                print(
-                                    f'{YELLOW}[NOTICE]: {WHITE}User has disconnected from the server.')
+                                print(f'{YELLOW}[NOTICE]: {WHITE}User has disconnected from the server.')
                                 # End the socket as the user had disconnected.
                                 read_sock.close()
                                 connections_list.remove(read_sock)
